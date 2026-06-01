@@ -1,13 +1,11 @@
 'use client'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase'
 
 const STEPS = ['الترحيب', 'بيانات الكنيسة', 'أكونت أبونا', 'تم!']
 
 export default function SetupPage() {
   const router = useRouter()
-  const supabase = createClient()
 
   const [step, setStep] = useState(0)
   const [form, setForm] = useState({
@@ -26,7 +24,6 @@ export default function SetupPage() {
   }
 
   async function handleFinish() {
-    // تحقق من البيانات
     if (!form.priestName.trim()) {
       setError('من فضلك ادخل اسم أبونا')
       return
@@ -52,40 +49,30 @@ export default function SetupPage() {
     setError('')
 
     try {
-      // إنشاء الأكونت
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email: form.email.trim().toLowerCase(),
-        password: form.password,
-        options: {
-          data: {
-            name: form.priestName.trim(),
-            role: 'admin',
-          },
-        },
+      const res = await fetch('/api/setup-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: form.email.trim().toLowerCase(),
+          password: form.password,
+          name: form.priestName.trim(),
+          churchName: form.churchName.trim(),
+        }),
       })
 
-      if (signUpError) {
-        if (signUpError.message.includes('already registered')) {
+      const data = await res.json()
+
+      if (!res.ok) {
+        if (data.error?.includes('already registered') || data.error?.includes('already been registered')) {
           setError('الإيميل ده مسجل قبل كده، جرب إيميل تاني')
         } else {
-          setError('حصل خطأ: ' + signUpError.message)
+          setError('حصل خطأ: ' + (data.error || 'جرب تاني'))
         }
         setLoading(false)
         return
       }
 
-      if (data.user) {
-        // تحديث الـ profile بالاسم والرول
-        await supabase
-          .from('profiles')
-          .update({
-            name: form.priestName.trim(),
-            role: 'admin',
-          })
-          .eq('id', data.user.id)
-
-        setStep(3)
-      }
+      setStep(3)
     } catch (err) {
       setError('حصل خطأ غير متوقع، جرب تاني')
     }
@@ -101,7 +88,6 @@ export default function SetupPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-4" dir="rtl">
       <div className="w-full max-w-md">
 
-        {/* Progress Steps */}
         {step < 3 && (
           <div className="flex items-center justify-center gap-2 mb-8">
             {[0, 1, 2].map(i => (
@@ -127,7 +113,6 @@ export default function SetupPage() {
 
         <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
 
-          {/* ======== الخطوة 0: الترحيب ======== */}
           {step === 0 && (
             <div className="p-8 text-center">
               <div className="w-24 h-24 bg-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-blue-200 dark:shadow-blue-900">
@@ -142,14 +127,12 @@ export default function SetupPage() {
               <p className="text-gray-400 dark:text-gray-500 text-xs leading-relaxed mb-8">
                 هنساعدك تسجّل كنيستك وتبدأ تستخدم النظام في أقل من دقيقتين
               </p>
-
               <button
                 onClick={() => setStep(1)}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-2xl py-4 text-base font-bold transition-all active:scale-95 shadow-lg shadow-blue-200 dark:shadow-blue-900"
               >
                 ابدأ التسجيل ←
               </button>
-
               <button
                 onClick={handleLogin}
                 className="w-full mt-3 text-sm text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 py-2 transition-colors"
@@ -159,7 +142,6 @@ export default function SetupPage() {
             </div>
           )}
 
-          {/* ======== الخطوة 1: بيانات الكنيسة ======== */}
           {step === 1 && (
             <div className="p-8">
               <div className="text-center mb-6">
@@ -167,12 +149,9 @@ export default function SetupPage() {
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white mt-3">بيانات الكنيسة</h2>
                 <p className="text-gray-400 dark:text-gray-500 text-sm mt-1">ادخل اسم الكنيسة (اختياري)</p>
               </div>
-
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    اسم الكنيسة
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">اسم الكنيسة</label>
                   <input
                     placeholder="مثلاً: كنيسة مارجرجس بالمنطقة"
                     value={form.churchName}
@@ -182,7 +161,6 @@ export default function SetupPage() {
                   />
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5">ممكن تسيبه فاضي لو مش عايز</p>
                 </div>
-
                 <div className="flex gap-3 pt-2">
                   <button
                     onClick={() => setStep(0)}
@@ -201,7 +179,6 @@ export default function SetupPage() {
             </div>
           )}
 
-          {/* ======== الخطوة 2: بيانات أبونا ======== */}
           {step === 2 && (
             <div className="p-8">
               <div className="text-center mb-6">
@@ -209,12 +186,9 @@ export default function SetupPage() {
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white mt-3">أكونت أبونا</h2>
                 <p className="text-gray-400 dark:text-gray-500 text-sm mt-1">البيانات دي هيستخدمها أبونا عشان يدخل على النظام</p>
               </div>
-
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    اسم أبونا <span className="text-red-500">*</span>
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">اسم أبونا <span className="text-red-500">*</span></label>
                   <input
                     placeholder="مثلاً: أبونا بولس"
                     value={form.priestName}
@@ -222,11 +196,8 @@ export default function SetupPage() {
                     className="w-full border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white transition-all"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    الإيميل <span className="text-red-500">*</span>
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">الإيميل <span className="text-red-500">*</span></label>
                   <input
                     type="email"
                     placeholder="priest@church.com"
@@ -236,11 +207,8 @@ export default function SetupPage() {
                     dir="ltr"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    الباسورد <span className="text-red-500">*</span>
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">الباسورد <span className="text-red-500">*</span></label>
                   <input
                     type="password"
                     placeholder="6 حروف على الأقل"
@@ -249,11 +217,8 @@ export default function SetupPage() {
                     className="w-full border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white transition-all"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    تأكيد الباسورد <span className="text-red-500">*</span>
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">تأكيد الباسورد <span className="text-red-500">*</span></label>
                   <input
                     type="password"
                     placeholder="أعد كتابة الباسورد"
@@ -297,24 +262,18 @@ export default function SetupPage() {
             </div>
           )}
 
-          {/* ======== الخطوة 3: تم! ======== */}
           {step === 3 && (
             <div className="p-8 text-center">
               <div className="w-24 h-24 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
                 <span className="text-5xl">🎉</span>
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                تم التسجيل بنجاح!
-              </h2>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">تم التسجيل بنجاح!</h2>
               <p className="text-gray-500 dark:text-gray-400 text-sm mb-2">
                 أهلاً، <span className="font-semibold text-gray-700 dark:text-gray-300">{form.priestName}</span>
               </p>
               {form.churchName && (
-                <p className="text-gray-400 dark:text-gray-500 text-xs mb-6">
-                  {form.churchName}
-                </p>
+                <p className="text-gray-400 dark:text-gray-500 text-xs mb-6">{form.churchName}</p>
               )}
-
               <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-4 mb-6 text-right">
                 <p className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-3">بيانات الدخول بتاعتك:</p>
                 <div className="space-y-2">
@@ -329,7 +288,6 @@ export default function SetupPage() {
                 </div>
                 <p className="text-xs text-blue-400 dark:text-blue-500 mt-3">⚠️ احتفظ بالبيانات دي في مكان آمن</p>
               </div>
-
               <button
                 onClick={handleLogin}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-2xl py-4 text-base font-bold transition-all active:scale-95 shadow-lg shadow-blue-200 dark:shadow-blue-900"

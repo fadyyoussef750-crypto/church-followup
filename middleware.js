@@ -27,38 +27,21 @@ export async function middleware(request) {
 
   const path = request.nextUrl.pathname
 
-  // صفحة setup: متشيكش عليها ومتعملش redirect
-  if (path === '/setup') {
+  // صفحة setup و register: متشيكش عليها
+  if (path === '/setup' || path === '/register' || path === '/') {
     return supabaseResponse
-  }
-
-  // تحقق لو في أدمين موجود — لو لأ روح setup
-  if (path === '/' || path === '/login') {
-    try {
-      const { data: adminCheck } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('role', 'admin')
-        .limit(1)
-
-      if (!adminCheck || adminCheck.length === 0) {
-        return NextResponse.redirect(new URL('/setup', request.url))
-      }
-    } catch {
-      // لو حصل error، خلّيه يكمل عادي
-    }
   }
 
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // لو مش logged in وبيحاول يدخل أي صفحة غير login أو setup
-  if (!user && path !== '/login' && path !== '/setup') {
+  // لو مش logged in وبيحاول يدخل أي صفحة غير login أو setup أو register
+  if (!user && path !== '/login' && path !== '/setup' && path !== '/register') {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // لو logged in وبيحاول يدخل login تاني
+  // لو logged in وبيحاول يدخل login
   if (user && path === '/login') {
     const { data: profile } = await supabase
       .from('profiles')
